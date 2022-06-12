@@ -5,15 +5,19 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
+
 import it.polito.tdp.PremierLeague.model.Action;
+import it.polito.tdp.PremierLeague.model.Arco;
 import it.polito.tdp.PremierLeague.model.Match;
 import it.polito.tdp.PremierLeague.model.Player;
 import it.polito.tdp.PremierLeague.model.Team;
 
 public class PremierLeagueDAO {
 	
-	public List<Player> listAllPlayers(){
+	public List<Player> listAllPlayers(Map<Integer,Player> idMap){
 		String sql = "SELECT * FROM Players";
 		List<Player> result = new ArrayList<Player>();
 		Connection conn = DBConnect.getConnection();
@@ -25,6 +29,7 @@ public class PremierLeagueDAO {
 
 				Player player = new Player(res.getInt("PlayerID"), res.getString("Name"));
 				result.add(player);
+				idMap.put(res.getInt("PlayerID"), player);
 			}
 			conn.close();
 			return result;
@@ -109,6 +114,58 @@ public class PremierLeagueDAO {
 			e.printStackTrace();
 			return null;
 		}
+	}
+	
+	public List<Player> getPlayerPartita(Integer idPartita,Map<Integer,Player> idMap){
+		String sql="SELECT PlayerID as id "
+				+ "FROM Actions "
+				+ "WHERE MatchID = ?";
+		List<Player> result= new LinkedList<Player>();
+		Connection conn= DBConnect.getConnection();
+		try {
+			PreparedStatement st= conn.prepareStatement(sql);
+			st.setInt(1, idPartita);
+			ResultSet rs= st.executeQuery();
+			while(rs.next()) {
+				Player p = idMap.get(rs.getInt("id"));
+				result.add(p);
+			}
+			conn.close();
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			throw new RuntimeException("SQL ERROR");
+		}
+		return result;
+	}
+	
+	public List<Arco> getArco(Integer idPartita,Map<Integer,Player> idMap){
+		String sql="SELECT a1.PlayerID AS id1, a2.PlayerID AS id2, (((a1.TotalSuccessfulPassesAll+a1.assists)/(a1.timePlayed))-((a2.TotalSuccessfulPassesAll+a2.assists)/(a2.timePlayed))) AS dif "
+				+ "FROM Actions a1, Actions a2 "
+				+ "WHERE a1.MatchID = ? "
+				+ "AND a2.MatchID=a1.MatchID "
+				+ "AND a1.PlayerID>a2.PlayerId "
+				+ "AND a1.TeamID<>a2.TeamID";
+		List<Arco> result= new LinkedList<Arco>();
+		Connection conn= DBConnect.getConnection();
+		try {
+			PreparedStatement st= conn.prepareStatement(sql);
+			st.setInt(1,idPartita);
+			ResultSet rs= st.executeQuery();
+			while(rs.next()) {
+				Player p1=idMap.get(rs.getInt("id1"));
+				Player p2=idMap.get(rs.getInt("id2"));
+				double peso= rs.getDouble("dif");
+				Arco a = new Arco(p1,p2,peso);
+				result.add(a);
+			}
+			conn.close();
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			throw new RuntimeException("SQL ERROR");
+		}
+		return result;
 	}
 	
 }
